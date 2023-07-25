@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ansible-parallel"
 # Format is YYYY.MM.DD (https://calver.org/)
-version = "2023.3.13"
+version = "2023.7.26"
 description = "Run ansible playbooks in parallel."
 authors = [
     { name = "Julien Palard", email = "julien@palard.fr" },

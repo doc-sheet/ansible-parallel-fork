@@ -3,6 +3,7 @@ import asyncio
 import os
 import subprocess
 import sys
+from collections import defaultdict
 from shutil import get_terminal_size
 from time import perf_counter
 from typing import List, Tuple
@@ -37,7 +38,7 @@ def prepare_chunk(playbook, chunk: str) -> Tuple[str, str, str]:
         if "changed:" in lines[1]:
             return ("CHANGED", playbook, chunk)
         if "failed:" in lines[1] or "fatal:" in lines[1]:
-            return ("FAILED", playbook, chunk)
+            return ("ERROR", playbook, chunk)
         if "unreachable:" in lines[1]:
             return ("UNREACHABLE", playbook, chunk)
     if chunk.startswith("TASK"):
@@ -96,7 +97,7 @@ def truncate(string, max_width):
 
 
 async def show_progression(results: asyncio.Queue, playbooks: List[str], stream):
-    recaps = {}
+    recaps = defaultdict(list)
     starts = {}
     ends = {}
     currently_running = []
@@ -132,32 +133,31 @@ async def show_progression(results: asyncio.Queue, playbooks: List[str], stream)
                 stream.write("\033[m")  # Select Graphic Rendition: Attributes off.
                 stream.write(msg)
             if msgtype == "RECAP":
-                recaps[playbook] = msg
+                recaps[playbook].append(msg)
             if msgtype == "TASK":
                 stream.write("\033[0K")  # EL – Erase In Line with parameter 0.
                 stream.write("\033[m")  # Select Graphic Rendition: Attributes off.
                 stream.write(
                     truncate(msg.split("\n")[0], max_width=columns - longest_name - 4)
                 )
-            if (
-                msgtype == "ERROR"
-            ):  # Collect lines that start with "ERROR" for the recap
-                recaps[playbook] = (
-                    "\n".join([line for line in msg.split("\n") if "ERROR" in line])
-                    + "\n"
-                )
+            if msgtype == "ERROR":
+                recaps[playbook].append(msg)
             stream.write(f"\033[{diff}B")
             stream.write(f"\033[{columns + 1}D")
             stream.flush()
     finally:
         stream.write(ENABLE_CURSOR)
         stream.flush()
+
+    stream.write("\n")
     for playbook, recap in recaps.items():
         stream.write(
             f"# Playbook {playbook}, ran in {ends[playbook] - starts[playbook]:.0f}s\n"
         )
-        for line in recap.split("\n"):
-            if "PLAY RECAP" not in line:
+        for chunk in recap:
+            for line in chunk.split("\n"):
+                if "PLAY RECAP" in line:
+                    continue
                 stream.write(line)
                 stream.write("\n")
     stream.flush()
@@ -179,9 +179,7 @@ async def amain():
         *[
             run_playbook(playbook, remaining_args, results_queue)
             for playbook in args.playbook
-        ],
-        return_exceptions=True,
-    )
+        ])
     await results_queue.put(None)
     await printer_task
     return sum(results)
