@@ -59,7 +59,9 @@ async def run_playbook(playbook, args, results: asyncio.Queue):
         stderr=subprocess.STDOUT,
         env={**os.environ, "ANSIBLE_FORCE_COLOR": "1"},
     )
-    task = []
+    assert process.stdout
+
+    task: List[str] = []
     while True:
         line = (await process.stdout.readline()).decode()
         if not line:
@@ -179,7 +181,8 @@ async def amain():
         *[
             run_playbook(playbook, remaining_args, results_queue)
             for playbook in args.playbook
-        ])
+        ]
+    )
     await results_queue.put(None)
     await printer_task
     return sum(results)
