@@ -59,7 +59,9 @@ async def run_playbook(playbook, args, results: asyncio.Queue):
         stderr=subprocess.STDOUT,
         env={**os.environ, "ANSIBLE_FORCE_COLOR": "1"},
     )
-    task = []
+    assert process.stdout
+
+    task: List[str] = []
     while True:
         line = (await process.stdout.readline()).decode()
         if not line:
@@ -163,6 +165,11 @@ async def show_progression(results: asyncio.Queue, playbooks: List[str], stream)
     stream.flush()
 
 
+async def playbook_wrapper(semaphore, playbook, remaining_args, results_queue):
+    async with semaphore:
+        return await run_playbook(playbook, remaining_args, results_queue)
+
+
 async def amain():
     args, remaining_args = parse_args()
     # Verify all playbook files can be found
@@ -175,11 +182,18 @@ async def amain():
     printer_task = asyncio.create_task(
         show_progression(results_queue, args.playbook, sys.stderr)
     )
-    results = await asyncio.gather(
-        *[
-            run_playbook(playbook, remaining_args, results_queue)
-            for playbook in args.playbook
-        ])
+    semaphore = asyncio.Semaphore(
+        int(os.environ.get("ANSIBLE_RUNNER_MAX_PLAYBOOKS", 5))
+    )
+    playbook_tasks = [
+        asyncio.create_task(
+            playbook_wrapper(semaphore, playbook, remaining_args, results_queue)
+        )
+        for playbook in args.playbook
+    ]
+
+    results = await asyncio.gather(*playbook_tasks)
+
     await results_queue.put(None)
     await printer_task
     return sum(results)
