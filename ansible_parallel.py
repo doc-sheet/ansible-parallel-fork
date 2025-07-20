@@ -9,9 +9,39 @@ from time import perf_counter
 from typing import List, Tuple
 
 
+COMMON_ANSIBLE_OPTIONS = (
+    "-l",
+    "--limit",
+    "-e",
+    "--extra-vars",
+    "-t",
+    "--tags",
+    "--skip-tags",
+    "-f",
+    "--forks",
+    "-u",
+    "--user",
+)
+
+
+class CommonArgs(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        namespace.common_options += (str(option_string), *values)
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("playbook", nargs="+")
+    common_group = parser.add_argument_group(
+        "Bypass options", description="Common ansible-playbook options"
+    )
+    common_group.add_argument(
+        *COMMON_ANSIBLE_OPTIONS,
+        nargs=1,
+        action=CommonArgs,
+        default=[],
+        dest="common_options",
+    )
     return parser.parse_known_args()
 
 
@@ -185,9 +215,11 @@ async def amain():
     semaphore = asyncio.Semaphore(
         int(os.environ.get("ANSIBLE_RUNNER_MAX_PLAYBOOKS", 5))
     )
+
+    playbook_args = (*args.common_options, *remaining_args)
     playbook_tasks = [
         asyncio.create_task(
-            playbook_wrapper(semaphore, playbook, remaining_args, results_queue)
+            playbook_wrapper(semaphore, playbook, playbook_args, results_queue)
         )
         for playbook in args.playbook
     ]
