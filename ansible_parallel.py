@@ -213,7 +213,7 @@ async def amain():
         show_progression(results_queue, args.playbook, sys.stderr)
     )
     semaphore = asyncio.Semaphore(
-        int(os.environ.get("ANSIBLE_RUNNER_MAX_PLAYBOOKS", 5))
+        int(os.environ.get("ANSIBLE_PARALLEL_MAX_PLAYBOOKS", 5))
     )
 
     playbook_args = (*args.common_options, *remaining_args)
