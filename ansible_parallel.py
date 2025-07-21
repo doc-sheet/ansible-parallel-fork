@@ -32,15 +32,14 @@ class CommonArgs(argparse.Action):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("playbook", nargs="+")
-    common_group = parser.add_argument_group(
-        "Bypass options", description="Common ansible-playbook options"
-    )
+    common_group = parser.add_argument_group("Bypass options")
     common_group.add_argument(
         *COMMON_ANSIBLE_OPTIONS,
         nargs=1,
         action=CommonArgs,
         default=[],
         dest="common_options",
+        help=argparse.SUPPRESS,
     )
     return parser.parse_known_args()
 
