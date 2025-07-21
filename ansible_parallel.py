@@ -32,15 +32,14 @@ class CommonArgs(argparse.Action):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("playbook", nargs="+")
-    common_group = parser.add_argument_group(
-        "Bypass options", description="Common ansible-playbook options"
-    )
+    common_group = parser.add_argument_group("Bypass options")
     common_group.add_argument(
         *COMMON_ANSIBLE_OPTIONS,
         nargs=1,
         action=CommonArgs,
         default=[],
         dest="common_options",
+        help=argparse.SUPPRESS,
     )
     return parser.parse_known_args()
 
@@ -213,7 +212,7 @@ async def amain():
         show_progression(results_queue, args.playbook, sys.stderr)
     )
     semaphore = asyncio.Semaphore(
-        int(os.environ.get("ANSIBLE_RUNNER_MAX_PLAYBOOKS", 5))
+        int(os.environ.get("ANSIBLE_PARALLEL_MAX_PLAYBOOKS", 5))
     )
 
     playbook_args = (*args.common_options, *remaining_args)
