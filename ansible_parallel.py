@@ -199,13 +199,23 @@ async def playbook_wrapper(semaphore, playbook, remaining_args, results_queue):
         return await run_playbook(playbook, remaining_args, results_queue)
 
 
+def check_playbooks(playbooks: List[str]) -> bool:
+    # Verify all playbook files can be found
+
+    fail = False
+    for playbook in playbooks:
+        if not os.path.isfile(playbook):
+            print("Could not find playbook:", playbook, file=sys.stderr)
+            fail = True
+    return fail
+
+
 async def amain():
     args, remaining_args = parse_args()
-    # Verify all playbook files can be found
-    for playbook in args.playbook:
-        if not os.path.isfile(playbook):
-            print("Could not find playbook:", playbook)
-            return 1
+    if os.environ.get("ANSIBLE_PARALLEL_VERIFY_PLAYBOOKS") and check_playbooks(
+        args.playbook
+    ):
+        return 1
 
     results_queue = asyncio.Queue()
     printer_task = asyncio.create_task(
